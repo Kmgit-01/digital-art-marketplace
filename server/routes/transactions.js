@@ -2,6 +2,25 @@ const express = require('express');
 const router = express.Router();
 const { sql, getPool } = require('../db');
 
+router.get('/my-purchases/:buyerId', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const result = await pool.request()
+      .input('buyerId', sql.Int, req.params.buyerId)
+      .query(`
+        SELECT t.TransactionId, t.Amount, t.RoyaltyAmount, t.PaymentStatus, t.TransactionDate,
+               a.Title, a.PreviewImageUrl, a.Category
+        FROM Transactions t
+        JOIN Artworks a ON a.ArtworkId = t.ArtworkId
+        WHERE t.BuyerId = @buyerId
+        ORDER BY t.TransactionDate DESC
+      `);
+    res.json(result.recordset);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/purchase', async (req, res) => {
   const { artworkId, buyerId, paymentRef } = req.body;
 

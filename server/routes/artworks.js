@@ -22,6 +22,24 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/my-uploads/:artistId', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const result = await pool.request()
+      .input('artistId', sql.Int, req.params.artistId)
+      .query(`
+        SELECT ArtworkId, Title, Description, Category, Price,
+               PreviewImageUrl, IsSold, CreatedAt
+        FROM Artworks
+        WHERE ArtistId = @artistId
+        ORDER BY CreatedAt DESC
+      `);
+    res.json(result.recordset);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const pool = await getPool();
