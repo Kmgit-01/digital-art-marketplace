@@ -1,39 +1,77 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { useAuth } from '../AuthContext.jsx';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import api from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 export default function MyUploads() {
   const [artworks, setArtworks] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user) return;
-    axios.get(`/api/artworks/my-uploads/${user.userId}`)
-      .then(res => setArtworks(res.data))
-      .catch(err => setError(err.message));
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    api.get(`/artworks/my-uploads/${user.userId}`)
+      .then((res) => setArtworks(res.data))
+      .catch((err) => setError(err.response?.data?.error || err.message))
+      .finally(() => setLoading(false));
   }, [user]);
 
-  if (!user) return <p style={{ padding: '1rem' }}>Log in to see your uploads.</p>;
-  if (error) return <p style={{ padding: '1rem' }}>Error: {error}</p>;
+  if (loading) {
+    return (
+      <div className="loading-state">
+        <div className="spinner" />
+        <p>Loading your uploads...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="alert alert-error">{error}</div>;
+  }
 
   return (
-    <div style={{ padding: '1rem' }}>
-      <h2>My Uploads</h2>
-      {artworks.length === 0 && <p>You haven't uploaded anything yet.</p>}
-      {artworks.map(art => (
-        <div key={art.ArtworkId} style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '0.75rem', marginBottom: '0.75rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <img src={art.PreviewImageUrl} alt={art.Title} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px' }} />
-          <div>
-            <strong>{art.Title}</strong> ({art.Category})
-            <p style={{ margin: '0.25rem 0' }}>Price: ${art.Price}</p>
-            <p style={{ margin: '0.25rem 0' }}>
-              Status: {art.IsSold ? <span style={{ color: '#c0392b' }}>Sold</span> : <span style={{ color: '#27ae60' }}>Available</span>}
-            </p>
-            <p style={{ margin: '0.25rem 0', fontSize: '0.8rem', color: '#666' }}>{new Date(art.CreatedAt).toLocaleString()}</p>
-          </div>
+    <>
+      <div className="page-header">
+        <h1>My Uploads</h1>
+        <p>Track your listed artworks and sales</p>
+      </div>
+
+      {artworks.length === 0 ? (
+        <div className="empty-state">
+          <h3>No uploads yet</h3>
+          <p>Start sharing your art with the world.</p>
+          <Link to="/upload" className="btn btn-primary" style={{ marginTop: '1rem', display: 'inline-flex' }}>
+            Upload artwork
+          </Link>
         </div>
-      ))}
-    </div>
+      ) : (
+        artworks.map((art) => (
+          <div key={art.ArtworkId} className="list-card">
+            <img src={art.PreviewImageUrl} alt={art.Title} className="list-card-thumb" />
+            <div className="list-card-content">
+              <div className="list-card-title">{art.Title}</div>
+              <div className="list-card-meta">{art.Category} · ${Number(art.Price).toFixed(2)}</div>
+              <div className="list-card-meta">
+                Status:{' '}
+                {art.IsSold ? (
+                  <span className="status-sold">Sold</span>
+                ) : (
+                  <span className="status-available">Available</span>
+                )}
+              </div>
+              <div className="list-card-meta">{new Date(art.CreatedAt).toLocaleString()}</div>
+            </div>
+            <div className="list-card-actions">
+              <Link to={`/artwork/${art.ArtworkId}`} className="btn btn-secondary btn-sm">View</Link>
+            </div>
+          </div>
+        ))
+      )}
+    </>
   );
 }

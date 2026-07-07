@@ -1,52 +1,100 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { useAuth } from '../AuthContext.jsx';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import api from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 export default function MyPurchases() {
   const [purchases, setPurchases] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [resellStatus, setResellStatus] = useState({});
   const { user } = useAuth();
 
   const load = () => {
-    if (!user) return;
-    axios.get(`/api/transactions/my-purchases/${user.userId}`)
-      .then(res => setPurchases(res.data))
-      .catch(err => setError(err.message));
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    api.get(`/transactions/my-purchases/${user.userId}`)
+      .then((res) => setPurchases(res.data))
+      .catch((err) => setError(err.response?.data?.error || err.message))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, [user]);
 
   const handleResell = async (artworkId) => {
-    setResellStatus(prev => ({ ...prev, [artworkId]: 'Relisting...' }));
+    setResellStatus((prev) => ({ ...prev, [artworkId]: 'Relisting...' }));
     try {
-      await axios.post(`/api/artworks/${artworkId}/resell`, { ownerId: user.userId });
-      setResellStatus(prev => ({ ...prev, [artworkId]: 'Relisted! Now visible in Browse.' }));
+      await api.post(`/artworks/${artworkId}/resell`, { ownerId: user.userId });
+      setResellStatus((prev) => ({ ...prev, [artworkId]: 'Relisted! Now visible in the gallery.' }));
     } catch (err) {
-      setResellStatus(prev => ({ ...prev, [artworkId]: `Error: ${err.response?.data?.error || err.message}` }));
+      setResellStatus((prev) => ({
+        ...prev,
+        [artworkId]: err.response?.data?.error || err.message,
+      }));
     }
   };
 
-  if (!user) return <p style={{ padding: '1rem' }}>Log in to see your purchases.</p>;
-  if (error) return <p style={{ padding: '1rem' }}>Error: {error}</p>;
+  if (loading) {
+    return (
+      <div className="loading-state">
+        <div className="spinner" />
+        <p>Loading your purchases...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="alert alert-error">{error}</div>;
+  }
 
   return (
-    <div style={{ padding: '1rem' }}>
-      <h2>My Purchases</h2>
-      {purchases.length === 0 && <p>No purchases yet.</p>}
-      {purchases.map(p => (
-        <div key={p.TransactionId} style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '0.75rem', marginBottom: '0.75rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <img src={p.PreviewImageUrl} alt={p.Title} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px' }} />
-          <div style={{ flex: 1 }}>
-            <strong>{p.Title}</strong> ({p.Category})
-            <p style={{ margin: '0.25rem 0' }}>Amount paid: ${p.Amount} | Royalty: ${p.RoyaltyAmount}</p>
-            <p style={{ margin: '0.25rem 0' }}>Status: {p.PaymentStatus} | Transaction #{p.TransactionId}</p>
-            <p style={{ margin: '0.25rem 0', fontSize: '0.8rem', color: '#666' }}>{new Date(p.TransactionDate).toLocaleString()}</p>
-            <button onClick={() => handleResell(p.ArtworkId)}>Resell this artwork</button>
-            {resellStatus[p.ArtworkId] && <p style={{ fontSize: '0.85rem' }}>{resellStatus[p.ArtworkId]}</p>}
-          </div>
+    <>
+      <div className="page-header">
+        <h1>My Purchases</h1>
+        <p>Your collection and resale options</p>
+      </div>
+
+      {purchases.length === 0 ? (
+        <div className="empty-state">
+          <h3>No purchases yet</h3>
+          <p>Explore the gallery and find something you love.</p>
+          <Link to="/" className="btn btn-primary" style={{ marginTop: '1rem', display: 'inline-flex' }}>
+            Browse gallery
+          </Link>
         </div>
-      ))}
-    </div>
+      ) : (
+        purchases.map((p) => (
+          <div key={p.TransactionId} className="list-card">
+            <img src={p.PreviewImageUrl} alt={p.Title} className="list-card-thumb" />
+            <div className="list-card-content">
+              <div className="list-card-title">{p.Title}</div>
+              <div className="list-card-meta">{p.Category}</div>
+              <div className="list-card-meta">
+                Paid: ${Number(p.Amount).toFixed(2)}
+                {Number(p.RoyaltyAmount) > 0 && ` · Royalty: $${Number(p.RoyaltyAmount).toFixed(2)}`}
+              </div>
+              <div className="list-card-meta">
+                {p.PaymentStatus} · Transaction #{p.TransactionId}
+              </div>
+              <div className="list-card-meta">{new Date(p.TransactionDate).toLocaleString()}</div>
+              {resellStatus[p.ArtworkId] && (
+                <div className={`alert ${resellStatus[p.ArtworkId].startsWith('Relisted') ? 'alert-success' : resellStatus[p.ArtworkId] === 'Relisting...' ? 'alert-info' : 'alert-error'}`} style={{ marginTop: '0.75rem', marginBottom: 0 }}>
+                  {resellStatus[p.ArtworkId]}
+                </div>
+              )}
+            </div>
+            <div className="list-card-actions">
+              <Link to={`/artwork/${p.ArtworkId}`} className="btn btn-secondary btn-sm">View</Link>
+              <button className="btn btn-primary btn-sm" onClick={() => handleResell(p.ArtworkId)}>
+                Resell
+              </button>
+            </div>
+          </div>
+        ))
+      )}
+    </>
   );
 }
