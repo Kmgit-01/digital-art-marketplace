@@ -30,6 +30,9 @@ export default function Upload() {
   return (
     <form onSubmit={handleSubmit} style={{ padding: '1rem', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
       <h2>Upload artwork</h2>
+<p style={{ background: '#fff8e1', border: '1px solid #ffca28', borderRadius: '6px', padding: '0.5rem', fontSize: '0.85rem' }}>
+  Want to resell artwork you've purchased? Go to <strong>My Purchases</strong> and use the "Resell this artwork" button instead — this keeps the original artist's royalty intact.
+</p>
       <input name="artistId" placeholder="Your artist user ID" onChange={handleChange} required />
       <input name="title" placeholder="Title" onChange={handleChange} required />
       <textarea name="description" placeholder="Description" onChange={handleChange} />

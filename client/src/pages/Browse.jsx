@@ -30,12 +30,14 @@ export default function Browse() {
         paymentRef: `demo-${Date.now()}`
       });
       setPurchased(prev => ({
-        ...prev,
-        [artworkId]: {
-          transactionId: res.data.transactionId,
-          royaltyAmount: res.data.royaltyAmount
-        }
-      }));
+  ...prev,
+  [artworkId]: {
+    transactionId: res.data.transactionId,
+    royaltyAmount: res.data.royaltyAmount,
+    sellerPayout: res.data.sellerPayout,
+    isResale: res.data.isResale
+  }
+}));
       setBuyStatus(prev => ({ ...prev, [artworkId]: '' }));
     } catch (err) {
       setBuyStatus(prev => ({ ...prev, [artworkId]: `Error: ${err.response?.data?.error || err.message}` }));
@@ -63,11 +65,18 @@ export default function Browse() {
                 </>
               ) : (
                 <div style={{ background: '#e8f5e9', border: '1px solid #4caf50', borderRadius: '6px', padding: '0.5rem', fontSize: '0.85rem' }}>
-                  <strong>✅ Purchase confirmed</strong>
-                  <p style={{ margin: '0.25rem 0' }}>Transaction ID: {bought.transactionId}</p>
-                  <p style={{ margin: '0.25rem 0' }}>Royalty paid: ${bought.royaltyAmount}</p>
-                  <p style={{ margin: '0.25rem 0' }}>License issued to buyer #{user.userId}</p>
-                </div>
+  <strong>✅ Purchase confirmed</strong>
+  <p style={{ margin: '0.25rem 0' }}>Transaction ID: {bought.transactionId}</p>
+  {bought.isResale ? (
+    <>
+      <p style={{ margin: '0.25rem 0' }}>Artist royalty (25%): ${bought.royaltyAmount}</p>
+      <p style={{ margin: '0.25rem 0' }}>Seller payout (75%): ${bought.sellerPayout}</p>
+    </>
+  ) : (
+    <p style={{ margin: '0.25rem 0' }}>First sale — full amount to artist: ${bought.sellerPayout}</p>
+  )}
+  <p style={{ margin: '0.25rem 0' }}>License issued to buyer #{user.userId}</p>
+</div>
               )}
             </div>
           </div>

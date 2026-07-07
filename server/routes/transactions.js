@@ -8,7 +8,7 @@ router.get('/my-purchases/:buyerId', async (req, res) => {
     const result = await pool.request()
       .input('buyerId', sql.Int, req.params.buyerId)
       .query(`
-        SELECT t.TransactionId, t.Amount, t.RoyaltyAmount, t.PaymentStatus, t.TransactionDate,
+        SELECT t.TransactionId, t.ArtworkId, t.Amount, t.RoyaltyAmount, t.PaymentStatus, t.TransactionDate,
                a.Title, a.PreviewImageUrl, a.Category
         FROM Transactions t
         JOIN Artworks a ON a.ArtworkId = t.ArtworkId
@@ -42,11 +42,13 @@ router.post('/purchase', async (req, res) => {
         ORDER BY IssuedAt DESC
       `);
     const sellerId = licenseResult.recordset[0]?.OwnerId || artwork.ArtistId;
-    const isResale = licenseResult.recordset.length > 0;
-
-    const royaltyAmount = isResale
-      ? Number((artwork.Price * (artwork.RoyaltyPercent / 100)).toFixed(2))
-      : 0;
+const isResale = licenseResult.recordset.length > 0;
+const royaltyAmount = isResale
+  ? Number((artwork.Price * 0.25).toFixed(2))
+  : 0;
+const sellerPayout = isResale
+  ? Number((artwork.Price - royaltyAmount).toFixed(2))
+  : artwork.Price;
 
     const txResult = await pool.request()
       .input('artworkId', sql.Int, artworkId)
@@ -87,7 +89,7 @@ router.post('/purchase', async (req, res) => {
       .input('artworkId', sql.Int, artworkId)
       .query('UPDATE Artworks SET IsSold = 1 WHERE ArtworkId = @artworkId');
 
-    res.status(201).json({ transactionId, royaltyAmount });
+    res.status(201).json({ transactionId, royaltyAmount, sellerPayout, isResale });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

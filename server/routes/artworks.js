@@ -40,6 +40,40 @@ router.get('/my-uploads/:artistId', async (req, res) => {
   }
 });
 
+router.post('/:id/resell', async (req, res) => {
+  try {
+    const { ownerId, newPrice } = req.body;
+    const pool = await getPool();
+
+    // Verify this person actually owns the current license for this artwork
+    const licenseResult = await pool.request()
+      .input('artworkId', sql.Int, req.params.id)
+      .query(`
+        SELECT TOP 1 OwnerId FROM Licenses
+        WHERE ArtworkId = @artworkId
+        ORDER BY IssuedAt DESC
+      `);
+    const currentOwner = licenseResult.recordset[0]?.OwnerId;
+
+    if (!currentOwner || currentOwner !== Number(ownerId)) {
+      return res.status(403).json({ error: 'You do not own a license for this artwork' });
+    }
+
+    await pool.request()
+      .input('id', sql.Int, req.params.id)
+      .input('price', sql.Decimal(10, 2), newPrice)
+      .query(`
+        UPDATE Artworks
+        SET IsSold = 0, Price = COALESCE(@price, Price)
+        WHERE ArtworkId = @id
+      `);
+
+    res.json({ message: 'Artwork relisted for resale' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const pool = await getPool();
