@@ -74,6 +74,53 @@ router.post('/:id/resell', async (req, res) => {
   }
 });
 
+router.get('/:id/comments', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const result = await pool.request()
+      .input('id', sql.Int, req.params.id)
+      .query(`
+        SELECT c.CommentId, c.Content, c.CreatedAt, c.UserId, u.FullName, u.Role
+        FROM Comments c
+        INNER JOIN Users u ON u.UserId = c.UserId
+        WHERE c.ArtworkId = @id
+        ORDER BY c.CreatedAt DESC
+      `);
+
+    res.json(result.recordset);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/comments', async (req, res) => {
+  try {
+    const { userId, content } = req.body;
+
+    if (!userId || !content?.trim()) {
+      return res.status(400).json({ error: 'Please provide a comment' });
+    }
+
+    const pool = await getPool();
+    const result = await pool.request()
+      .input('artworkId', sql.Int, req.params.id)
+      .input('userId', sql.Int, userId)
+      .input('content', sql.NVarChar(1000), content.trim())
+      .query(`
+        INSERT INTO Comments (ArtworkId, UserId, Content)
+        OUTPUT INSERTED.CommentId, INSERTED.CreatedAt
+        VALUES (@artworkId, @userId, @content)
+      `);
+
+    res.status(201).json({
+      commentId: result.recordset[0].CommentId,
+      createdAt: result.recordset[0].CreatedAt,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const pool = await getPool();

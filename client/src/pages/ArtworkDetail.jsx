@@ -13,11 +13,26 @@ export default function ArtworkDetail() {
   const [buying, setBuying] = useState(false);
   const [purchase, setPurchase] = useState(null);
   const [buyError, setBuyError] = useState('');
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState('');
+  const [commentLoading, setCommentLoading] = useState(false);
+  const [commentError, setCommentError] = useState('');
 
   useEffect(() => {
-    api.get(`/artworks/${id}`)
-      .then((res) => setArtwork(res.data))
-      .catch((err) => setError(err.response?.data?.error || err.message))
+    if (!id) return;
+
+    Promise.all([
+      api.get(`/artworks/${id}`),
+      api.get(`/artworks/${id}/comments`),
+    ])
+      .then(([artworkRes, commentsRes]) => {
+        setArtwork(artworkRes.data);
+        setComments(commentsRes.data);
+      })
+      .catch((err) => {
+        setError(err.response?.data?.error || err.message);
+        setCommentError('Unable to load community discussion right now.');
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -40,6 +55,48 @@ export default function ArtworkDetail() {
       setBuyError(err.response?.data?.error || err.message);
     } finally {
       setBuying(false);
+    }
+  };
+
+  const handleCommentSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!user) {
+      setCommentError('Please sign in to join the discussion.');
+      return;
+    }
+
+    const trimmed = commentText.trim();
+    if (!trimmed) {
+      setCommentError('Write a question or comment before posting.');
+      return;
+    }
+
+    setCommentLoading(true);
+    setCommentError('');
+
+    try {
+      const res = await api.post(`/artworks/${id}/comments`, {
+        userId: user.userId,
+        content: trimmed,
+      });
+
+      setComments((prev) => [
+        {
+          CommentId: res.data.commentId,
+          Content: trimmed,
+          CreatedAt: res.data.createdAt,
+          UserId: user.userId,
+          FullName: user.fullName || 'You',
+          Role: user.role || 'buyer',
+        },
+        ...prev,
+      ]);
+      setCommentText('');
+    } catch (err) {
+      setCommentError(err.response?.data?.error || err.message);
+    } finally {
+      setCommentLoading(false);
     }
   };
 
@@ -123,6 +180,56 @@ export default function ArtworkDetail() {
               </button>
             </div>
           )}
+
+          <div className="community-panel">
+            <div className="community-header">
+              <div>
+                <h3>Community discussion</h3>
+                <p>Ask questions, share feedback, or connect with the artist and fellow buyers.</p>
+              </div>
+            </div>
+
+            {user ? (
+              <form className="comment-form" onSubmit={handleCommentSubmit}>
+                <textarea
+                  className="form-textarea"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Start a conversation about this artwork..."
+                  rows="4"
+                />
+                <div className="comment-form-actions">
+                  <button type="submit" className="btn btn-primary btn-sm" disabled={commentLoading}>
+                    {commentLoading ? 'Posting...' : 'Post comment'}
+                  </button>
+                </div>
+                {commentError && <div className="alert alert-error">{commentError}</div>}
+              </form>
+            ) : (
+              <div className="alert alert-info">
+                Sign in to join the discussion and ask the artist or other buyers about this art.
+              </div>
+            )}
+
+            <div className="community-list">
+              {comments.length === 0 ? (
+                <div className="empty-state" style={{ padding: '1.5rem 0' }}>
+                  No conversations yet. Start the first one.
+                </div>
+              ) : (
+                comments.map((comment) => (
+                  <article key={comment.CommentId} className="community-item">
+                    <div className="community-item-meta">
+                      <strong>{comment.FullName}</strong>
+                      <span className="role-tag">{comment.Role || 'buyer'}</span>
+                      <span>{new Date(comment.CreatedAt).toLocaleString()}</span>
+                    </div>
+                    <p>{comment.Content}</p>
+                  </article>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </>
