@@ -16,7 +16,7 @@ export default function MyPurchases() {
       return;
     }
 
-    api.get(`/transactions/my-purchases/${user.userId}`)
+    api.get(`/transactions/my-purchases/₹{user.userId}`)
       .then((res) => setPurchases(res.data))
       .catch((err) => setError(err.response?.data?.error || err.message))
       .finally(() => setLoading(false));
@@ -27,7 +27,7 @@ export default function MyPurchases() {
   const handleResell = async (artworkId) => {
     setResellStatus((prev) => ({ ...prev, [artworkId]: 'Relisting...' }));
     try {
-      await api.post(`/artworks/${artworkId}/resell`, { ownerId: user.userId });
+      await api.post(`/artworks/₹{artworkId}/resell`, { ownerId: user.userId });
       setResellStatus((prev) => ({ ...prev, [artworkId]: 'Relisted! Now visible in the gallery.' }));
     } catch (err) {
       setResellStatus((prev) => ({
@@ -73,21 +73,21 @@ export default function MyPurchases() {
               <div className="list-card-title">{p.Title}</div>
               <div className="list-card-meta">{p.Category}</div>
               <div className="list-card-meta">
-                Paid: ${Number(p.Amount).toFixed(2)}
-                {Number(p.RoyaltyAmount) > 0 && ` · Royalty: $${Number(p.RoyaltyAmount).toFixed(2)}`}
+                Paid: ₹{Number(p.Amount).toFixed(2)}
+                {Number(p.RoyaltyAmount) > 0 && ` · Royalty: ₹₹{Number(p.RoyaltyAmount).toFixed(2)}`}
               </div>
               <div className="list-card-meta">
                 {p.PaymentStatus} · Transaction #{p.TransactionId}
               </div>
               <div className="list-card-meta">{new Date(p.TransactionDate).toLocaleString()}</div>
               {resellStatus[p.ArtworkId] && (
-                <div className={`alert ${resellStatus[p.ArtworkId].startsWith('Relisted') ? 'alert-success' : resellStatus[p.ArtworkId] === 'Relisting...' ? 'alert-info' : 'alert-error'}`} style={{ marginTop: '0.75rem', marginBottom: 0 }}>
+                <div className={`alert ₹{resellStatus[p.ArtworkId].startsWith('Relisted') ? 'alert-success' : resellStatus[p.ArtworkId] === 'Relisting...' ? 'alert-info' : 'alert-error'}`} style={{ marginTop: '0.75rem', marginBottom: 0 }}>
                   {resellStatus[p.ArtworkId]}
                 </div>
               )}
             </div>
             <div className="list-card-actions">
-              <Link to={`/artwork/${p.ArtworkId}`} className="btn btn-secondary btn-sm">View</Link>
+              <Link to={`/artwork/₹{p.ArtworkId}`} className="btn btn-secondary btn-sm">View</Link>
               <button className="btn btn-primary btn-sm" onClick={() => handleResell(p.ArtworkId)}>
                 Resell
               </button>

@@ -2,6 +2,37 @@ const express = require('express');
 const router = express.Router();
 const { sql, getPool } = require('../db');
 
+const Razorpay = require('razorpay');
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+router.post('/create-order', async (req, res) => {
+  try {
+    const { amount } = req.body;
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Valid amount is required' });
+    }
+
+    const order = await razorpay.orders.create({
+      amount: Math.round(amount * 100), // Razorpay expects paise, not rupees
+      currency: 'INR',
+      receipt: `receipt_${Date.now()}`,
+    });
+
+    res.json({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: process.env.RAZORPAY_KEY_ID,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/my-purchases/:buyerId', async (req, res) => {
   try {
     const pool = await getPool();
@@ -22,11 +53,23 @@ router.get('/my-purchases/:buyerId', async (req, res) => {
 });
 
 router.post('/purchase', async (req, res) => {
-  const { artworkId, buyerId, paymentRef } = req.body;
+  const { artworkId, buyerId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-  if (!artworkId || !buyerId || !paymentRef) {
-    return res.status(400).json({ error: 'Missing required fields: artworkId, buyerId, paymentRef' });
+  if (!artworkId || !buyerId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).json({ error: 'Missing required payment verification fields' });
   }
+
+  const crypto = require('crypto');
+  const expectedSignature = crypto
+    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+    .digest('hex');
+
+  if (expectedSignature !== razorpay_signature) {
+    return res.status(400).json({ error: 'Payment verification failed — signature mismatch' });
+  }
+
+  const paymentRef = razorpay_payment_id;
 
   const pool = await getPool();
   const transaction = new sql.Transaction(pool);

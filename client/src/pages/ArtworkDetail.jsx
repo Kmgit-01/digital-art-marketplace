@@ -18,6 +18,8 @@ export default function ArtworkDetail() {
   const [commentLoading, setCommentLoading] = useState(false);
   const [commentError, setCommentError] = useState('');
 
+  const [payError, setPayError] = useState('');
+
   useEffect(() => {
     if (!id) return;
 
@@ -36,24 +38,66 @@ export default function ArtworkDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleBuy = async () => {
+const handleBuy = async () => {
     if (!user) {
       navigate('/login');
       return;
     }
     setBuying(true);
     setBuyError('');
+    setPayError('');
+
     try {
-      const res = await api.post('/transactions/purchase', {
-        artworkId: Number(id),
-        buyerId: user.userId,
-        paymentRef: `demo-${Date.now()}`,
+      const orderRes = await api.post('/transactions/create-order', {
+        amount: artwork.Price,
       });
-      setPurchase(res.data);
-      setArtwork((prev) => ({ ...prev, IsSold: true }));
+      const { orderId, amount, currency, keyId } = orderRes.data;
+
+      const options = {
+        key: keyId,
+        amount,
+        currency,
+        name: 'Digital Art Marketplace',
+        description: artwork.Title,
+        order_id: orderId,
+        handler: async (response) => {
+          try {
+            const purchaseRes = await api.post('/transactions/purchase', {
+              artworkId: Number(id),
+              buyerId: user.userId,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            setPurchase(purchaseRes.data);
+            setArtwork((prev) => ({ ...prev, IsSold: true }));
+          } catch (err) {
+            setBuyError(err.response?.data?.error || err.message);
+          } finally {
+            setBuying(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setBuying(false);
+          },
+        },
+        prefill: {
+          name: user.fullName || '',
+        },
+        theme: {
+          color: '#7c3aed',
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', (response) => {
+        setPayError(response.error.description || 'Payment failed');
+        setBuying(false);
+      });
+      rzp.open();
     } catch (err) {
       setBuyError(err.response?.data?.error || err.message);
-    } finally {
       setBuying(false);
     }
   };
@@ -140,7 +184,7 @@ export default function ArtworkDetail() {
             </span>
           </div>
 
-          <div className="detail-price">${Number(artwork.Price).toFixed(2)}</div>
+          <div className="detail-price">₹{Number(artwork.Price).toFixed(2)}</div>
 
           {artwork.Description && (
             <p className="detail-description">{artwork.Description}</p>
@@ -152,11 +196,11 @@ export default function ArtworkDetail() {
               <p>Transaction ID: #{purchase.transactionId}</p>
               {purchase.isResale ? (
                 <>
-                  <p>Artist royalty (25%): ${Number(purchase.royaltyAmount).toFixed(2)}</p>
-                  <p>Seller payout (75%): ${Number(purchase.sellerPayout).toFixed(2)}</p>
+                  <p>Artist royalty (25%): ₹{Number(purchase.royaltyAmount).toFixed(2)}</p>
+                  <p>Seller payout (75%): ₹{Number(purchase.sellerPayout).toFixed(2)}</p>
                 </>
               ) : (
-                <p>First sale — full amount to artist: ${Number(purchase.sellerPayout).toFixed(2)}</p>
+                <p>First sale — full amount to artist: ₹{Number(purchase.sellerPayout).toFixed(2)}</p>
               )}
               <p>Personal license issued to you.</p>
               <Link to="/my-purchases" className="btn btn-secondary btn-sm" style={{ marginTop: '1rem', display: 'inline-flex' }}>
@@ -171,12 +215,13 @@ export default function ArtworkDetail() {
                 Purchase includes a personal-use license. Resales automatically pay 25% royalty to the original artist.
               </p>
               {buyError && <div className="alert alert-error">{buyError}</div>}
+              {payError && <div className="alert alert-error">{payError}</div>}
               <button
                 className="btn btn-primary"
                 onClick={handleBuy}
                 disabled={buying}
               >
-                {buying ? 'Processing...' : `Buy for $${Number(artwork.Price).toFixed(2)}`}
+                {buying ? 'Opening payment...' : `Buy for ₹${Number(artwork.Price).toFixed(2)}`}
               </button>
             </div>
           )}

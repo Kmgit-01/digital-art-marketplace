@@ -39,7 +39,7 @@ export default function Upload() {
       });
 
       setStatus('');
-      navigate(`/artwork/${res.data.artworkId}`);
+      navigate(`/artwork/₹{res.data.artworkId}`);
     } catch (err) {
       setStatus('');
       setError(err.response?.data?.error || err.message);

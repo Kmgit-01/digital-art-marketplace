@@ -15,7 +15,7 @@ export default function MyUploads() {
       return;
     }
 
-    api.get(`/artworks/my-uploads/${user.userId}`)
+    api.get(`/artworks/my-uploads/₹{user.userId}`)
       .then((res) => setArtworks(res.data))
       .catch((err) => setError(err.response?.data?.error || err.message))
       .finally(() => setLoading(false));
@@ -55,7 +55,7 @@ export default function MyUploads() {
             <img src={art.PreviewImageUrl} alt={art.Title} className="list-card-thumb" />
             <div className="list-card-content">
               <div className="list-card-title">{art.Title}</div>
-              <div className="list-card-meta">{art.Category} · ${Number(art.Price).toFixed(2)}</div>
+              <div className="list-card-meta">{art.Category} · ₹{Number(art.Price).toFixed(2)}</div>
               <div className="list-card-meta">
                 Status:{' '}
                 {art.IsSold ? (
@@ -67,7 +67,7 @@ export default function MyUploads() {
               <div className="list-card-meta">{new Date(art.CreatedAt).toLocaleString()}</div>
             </div>
             <div className="list-card-actions">
-              <Link to={`/artwork/${art.ArtworkId}`} className="btn btn-secondary btn-sm">View</Link>
+              <Link to={`/artwork/₹{art.ArtworkId}`} className="btn btn-secondary btn-sm">View</Link>
             </div>
           </div>
         ))

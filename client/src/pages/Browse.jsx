@@ -27,7 +27,7 @@ export default function Browse() {
       const res = await axios.post('/api/transactions/purchase', {
         artworkId,
         buyerId: user.userId,
-        paymentRef: `demo-${Date.now()}`
+        paymentRef: `demo-₹{Date.now()}`
       });
       setPurchased(prev => ({
   ...prev,
@@ -40,7 +40,7 @@ export default function Browse() {
 }));
       setBuyStatus(prev => ({ ...prev, [artworkId]: '' }));
     } catch (err) {
-      setBuyStatus(prev => ({ ...prev, [artworkId]: `Error: ${err.response?.data?.error || err.message}` }));
+      setBuyStatus(prev => ({ ...prev, [artworkId]: `Error: ₹{err.response?.data?.error || err.message}` }));
     }
   };
 
@@ -56,7 +56,7 @@ export default function Browse() {
             <img src={art.PreviewImageUrl} alt={art.Title} style={{ width: '100%', borderRadius: '6px', opacity: bought ? 0.5 : 1 }} />
             <h3>{art.Title}</h3>
             <p>{art.Category}</p>
-            <strong>${art.Price}</strong>
+            <strong>₹{art.Price}</strong>
             <div style={{ marginTop: '0.5rem' }}>
               {!bought ? (
                 <>
@@ -69,11 +69,11 @@ export default function Browse() {
   <p style={{ margin: '0.25rem 0' }}>Transaction ID: {bought.transactionId}</p>
   {bought.isResale ? (
     <>
-      <p style={{ margin: '0.25rem 0' }}>Artist royalty (25%): ${bought.royaltyAmount}</p>
-      <p style={{ margin: '0.25rem 0' }}>Seller payout (75%): ${bought.sellerPayout}</p>
+      <p style={{ margin: '0.25rem 0' }}>Artist royalty (25%): ₹{bought.royaltyAmount}</p>
+      <p style={{ margin: '0.25rem 0' }}>Seller payout (75%): ₹{bought.sellerPayout}</p>
     </>
   ) : (
-    <p style={{ margin: '0.25rem 0' }}>First sale — full amount to artist: ${bought.sellerPayout}</p>
+    <p style={{ margin: '0.25rem 0' }}>First sale — full amount to artist: ₹{bought.sellerPayout}</p>
   )}
   <p style={{ margin: '0.25rem 0' }}>License issued to buyer #{user.userId}</p>
 </div>
