@@ -39,7 +39,7 @@ export default function Upload() {
       });
 
       setStatus('');
-      navigate(`/artwork/₹{res.data.artworkId}`);
+      navigate(`/artwork/${res.data.artworkId}`);
     } catch (err) {
       setStatus('');
       setError(err.response?.data?.error || err.message);
@@ -87,7 +87,7 @@ export default function Upload() {
         </div>
 
         <div className="form-group">
-          <label htmlFor="price">Price (USD)</label>
+          <label htmlFor="price">Price (INR)</label>
           <input id="price" name="price" type="number" min="0" step="0.01" className="form-input" placeholder="99.00" onChange={handleChange} required />
         </div>
 

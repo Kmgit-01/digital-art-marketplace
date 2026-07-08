@@ -27,7 +27,7 @@ export default function Browse() {
       const res = await axios.post('/api/transactions/purchase', {
         artworkId,
         buyerId: user.userId,
-        paymentRef: `demo-₹{Date.now()}`
+        paymentRef: `demo-${Date.now()}`
       });
       setPurchased(prev => ({
   ...prev,
@@ -40,7 +40,7 @@ export default function Browse() {
 }));
       setBuyStatus(prev => ({ ...prev, [artworkId]: '' }));
     } catch (err) {
-      setBuyStatus(prev => ({ ...prev, [artworkId]: `Error: ₹{err.response?.data?.error || err.message}` }));
+      setBuyStatus(prev => ({ ...prev, [artworkId]: `Error: ${err.response?.data?.error || err.message}` }));
     }
   };
 

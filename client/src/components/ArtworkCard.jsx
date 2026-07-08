@@ -12,7 +12,7 @@ export default function ArtworkCard({ artwork }) {
         )}
         <h3 className="artwork-card-title">{artwork.Title}</h3>
         <div className="artwork-card-footer">
-          <span className="artwork-price">${Number(artwork.Price).toFixed(2)}</span>
+          <span className="artwork-price">₹{Number(artwork.Price).toFixed(2)}</span>
           <span className="btn btn-secondary btn-sm">View</span>
         </div>
       </div>
