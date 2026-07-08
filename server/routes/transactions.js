@@ -24,17 +24,35 @@ router.get('/my-purchases/:buyerId', async (req, res) => {
 router.post('/purchase', async (req, res) => {
   const { artworkId, buyerId, paymentRef } = req.body;
 
-  try {
-    const pool = await getPool();
+  if (!artworkId || !buyerId || !paymentRef) {
+    return res.status(400).json({ error: 'Missing required fields: artworkId, buyerId, paymentRef' });
+  }
 
-    const artworkResult = await pool.request()
+  const pool = await getPool();
+  const transaction = new sql.Transaction(pool);
+  let inTransaction = false;
+
+  try {
+    await transaction.begin();
+    inTransaction = true;
+
+    const artworkResult = await transaction.request()
       .input('id', sql.Int, artworkId)
-      .query('SELECT * FROM Artworks WHERE ArtworkId = @id AND IsSold = 0');
+      .query(`
+        SELECT *
+        FROM Artworks WITH (UPDLOCK, HOLDLOCK)
+        WHERE ArtworkId = @id
+        AND IsSold = 0
+      `);
 
     const artwork = artworkResult.recordset[0];
-    if (!artwork) return res.status(404).json({ error: 'Artwork not available' });
+    if (!artwork) {
+      const error = new Error('Artwork not available');
+      error.status = 404;
+      throw error;
+    }
 
-    const licenseResult = await pool.request()
+    const licenseResult = await transaction.request()
       .input('artworkId', sql.Int, artworkId)
       .query(`
         SELECT TOP 1 OwnerId FROM Licenses
@@ -42,15 +60,32 @@ router.post('/purchase', async (req, res) => {
         ORDER BY IssuedAt DESC
       `);
     const sellerId = licenseResult.recordset[0]?.OwnerId || artwork.ArtistId;
-const isResale = licenseResult.recordset.length > 0;
-const royaltyAmount = isResale
-  ? Number((artwork.Price * 0.25).toFixed(2))
-  : 0;
-const sellerPayout = isResale
-  ? Number((artwork.Price - royaltyAmount).toFixed(2))
-  : artwork.Price;
 
-    const txResult = await pool.request()
+    if (Number(buyerId) === Number(sellerId)) {
+      const error = new Error('You cannot purchase your own artwork');
+      error.status = 400;
+      throw error;
+    }
+
+    const isResale = licenseResult.recordset.length > 0;
+    const royaltyAmount = isResale
+      ? Number((artwork.Price * 0.25).toFixed(2))
+      : 0;
+    const sellerPayout = isResale
+      ? Number((artwork.Price - royaltyAmount).toFixed(2))
+      : artwork.Price;
+
+    const lockResult = await transaction.request()
+      .input('artworkId', sql.Int, artworkId)
+      .query('UPDATE Artworks SET IsSold = 1 WHERE ArtworkId = @artworkId AND IsSold = 0');
+
+    if (lockResult.rowsAffected[0] === 0) {
+      const error = new Error('Artwork was just purchased by someone else');
+      error.status = 409;
+      throw error;
+    }
+
+    const txResult = await transaction.request()
       .input('artworkId', sql.Int, artworkId)
       .input('buyerId', sql.Int, buyerId)
       .input('sellerId', sql.Int, sellerId)
@@ -64,7 +99,7 @@ const sellerPayout = isResale
       `);
     const transactionId = txResult.recordset[0].TransactionId;
 
-    await pool.request()
+    await transaction.request()
       .input('artworkId', sql.Int, artworkId)
       .input('ownerId', sql.Int, buyerId)
       .input('transactionId', sql.Int, transactionId)
@@ -74,7 +109,7 @@ const sellerPayout = isResale
       `);
 
     if (royaltyAmount > 0) {
-      await pool.request()
+      await transaction.request()
         .input('artworkId', sql.Int, artworkId)
         .input('artistId', sql.Int, artwork.ArtistId)
         .input('transactionId', sql.Int, transactionId)
@@ -85,13 +120,19 @@ const sellerPayout = isResale
         `);
     }
 
-    await pool.request()
-      .input('artworkId', sql.Int, artworkId)
-      .query('UPDATE Artworks SET IsSold = 1 WHERE ArtworkId = @artworkId');
+    await transaction.commit();
+    inTransaction = false;
 
     res.status(201).json({ transactionId, royaltyAmount, sellerPayout, isResale });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (inTransaction) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackErr) {
+        console.error('Rollback failed:', rollbackErr.message);
+      }
+    }
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
